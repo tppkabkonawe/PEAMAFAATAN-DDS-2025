@@ -1,0 +1,737 @@
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="https://upload.wikimedia.org/wikipedia/commons/7/76/Logo_Kementerian_Desa_dan_Pembangunan_Daerah_Tertinggal_Republik_Indonesia_%282024%29.svg">
+    <title>Database CRUD Spreadsheet (Auto Title)</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --danger: #dc2626;
+            --danger-hover: #b91c1c;
+            --bg-body: #f3f4f6;
+            --bg-card: #ffffff;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --border: #e5e7eb;
+            --header-bg: #f8fafc;
+            --sticky-header-bg: #f1f5f9;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+        
+        body { background-color: var(--bg-body); color: var(--text-main); padding: 20px; }
+
+        /* --- Layout --- */
+        .container { max-width: 98%; margin: 0 auto; background: var(--bg-card); border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); overflow: hidden; display: flex; flex-direction: column; height: 90vh; }
+        
+        header { padding: 10px 15px; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between; align-items: center; background: #fff; }
+        .header-title h1 { font-size: 1.25rem; font-weight: 600; color: var(--text-main); margin: 0; }
+        
+        /* Controls Bar */
+        .controls-bar { padding: 10px 20px; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between; align-items: center; background: #f8fafc; }
+        
+        .search-box { position: relative; flex: 1; min-width: 250px; max-width: 400px; }
+        .search-box input {
+            width: 100%; padding: 8px 12px 8px 35px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; outline: none;
+        }
+        .search-box input:focus { border-color: var(--primary); }
+        .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 14px; }
+
+        .pagination-controls { display: flex; gap: 10px; align-items: center; }
+        .pagination-controls select {
+            padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem;
+        }
+        .btn {
+            padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; font-weight: 500; font-size: 0.9rem; transition: all 0.2s;
+        }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+        .btn-secondary { background: #e5e7eb; color: var(--text-main); }
+        .btn-secondary:hover:not(:disabled) { background: #d1d5db; }
+
+        /* --- Table Area --- */
+        .table-wrapper { flex: 1; overflow: auto; position: relative; border-top: 1px solid var(--border); }
+        table { width: 100%; border-collapse: collapse; min-width: 1000px; table-layout: auto; }
+        
+        th, td { 
+            border: 1px solid var(--border); 
+            padding: 10px 12px; 
+            font-size: 0.85rem; 
+            vertical-align: middle;
+        }
+
+        /* --- HEADER STYLING UPDATE --- */
+        th { 
+            background: var(--header-bg); 
+            font-weight: 600; 
+            white-space: normal; 
+            text-align: center;  
+            vertical-align: middle; 
+            min-width: 120px;
+            max-width: 300px;
+            line-height: 1.4;
+            color: var(--text-main);
+        }
+
+        thead tr:last-child th {
+            position: sticky;
+            top: 0;
+            z-index: 20; 
+            background: var(--sticky-header-bg);
+            border-bottom: 2px solid #94a3b8; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); 
+        }
+        /* ----------------------------- */
+
+        td { text-align: left; white-space: nowrap; background: #fff; z-index: 1; position: relative; }
+        tr:hover td { background-color: #eff6ff; cursor: pointer; }
+        
+        @keyframes highlight {
+            0% { background-color: #bbf7d0; }
+            100% { background-color: transparent; }
+        }
+        .row-updated { animation: highlight 2s ease-out; }
+
+        .empty-state { padding: 40px; text-align: center; color: var(--text-muted); }
+
+        /* --- Modal --- */
+        .modal-backdrop {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(2px);
+            display: none; justify-content: center; align-items: center; z-index: 100;
+            opacity: 0; transition: opacity 0.3s;
+        }
+        .modal-backdrop.active { display: flex; opacity: 1; }
+        
+        .modal-content {
+            background: white; width: 90%; max-width: 900px; max-height: 90vh;
+            border-radius: 12px; display: flex; flex-direction: column;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        
+        .modal-header { padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .modal-title { font-size: 1.1rem; font-weight: 600; }
+        
+        .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+        
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+        
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-group label { font-size: 0.8rem; font-weight: 500; color: var(--text-muted); }
+        .form-group input, .form-group select, .form-group textarea {
+            padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; outline: none; transition: border 0.2s;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--primary); ring: 2px solid var(--primary); }
+        .form-group input:disabled, .form-group select:disabled { background-color: #f3f4f6; cursor: not-allowed; color: #9ca3af; }
+        
+        .modal-footer { padding: 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 12px; }
+
+        /* --- Loader --- */
+        .loader-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.8); z-index: 200; display: none;
+            justify-content: center; align-items: center; flex-direction: column;
+        }
+        .loader-overlay.active { display: flex; }
+        .spinner {
+            width: 40px; height: 40px; border: 4px solid #e5e7eb; border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* --- Toast --- */
+        #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 300; display: flex; flex-direction: column; gap: 10px; }
+        .toast { padding: 12px 20px; border-radius: 6px; color: white; font-size: 0.9rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); animation: slideIn 0.3s ease-out; }
+        .toast.success { background: #10b981; }
+        .toast.error { background: var(--danger); }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        .page-info { font-size: 0.9rem; color: var(--text-muted); font-weight: 500; min-width: 100px; text-align: center; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <div class="header-title">
+                <!-- Title auto update -->
+                <h1 id="sheetTitle">Load...</h1>
+            </div>
+            <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="searchInput" placeholder="Cari data..." onkeyup="handleSearch()">
+            </div>
+            <button disabled hidden class="btn btn-primary" onclick="openModal('create')">+ Tambah Data</button>
+        </header>
+        <div class="table-wrapper">
+            <table id="dataTable">
+                <thead id="tableHead">
+                    <!-- Headers injected via JS -->
+                </thead>
+                <tbody id="tableBody">
+                    <tr><td colspan="100" class="empty-state">Memuat data...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <!-- Control Bar -->
+        <div class="controls-bar">
+            <div class="pagination-controls">
+                <button class="btn btn-secondary" id="btnPrev" onclick="changePage(-1)">◀️</button> 
+                <div class="page-info" id="pageInfo">Hal 1 / 1</div>
+                <button class="btn btn-secondary" id="btnNext" onclick="changePage(1)">▶️</button>
+                
+                <select id="rowsPerPage" onchange="changeRowsPerPage()">
+                    <option value="10" selected>10 / hal</option>
+                    <option value="20">20 / hal</option>
+                    <option value="50">50 / hal</option>
+                    <option value="100">100 / hal</option>
+                </select>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Modal Form -->
+    <div class="modal-backdrop" id="crudModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title" id="modalTitle">Edit Data</div>
+                <button class="btn btn-secondary" onclick="closeModal()" style="padding: 4px 8px;">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="crudForm">
+                    <input type="hidden" name="id" id="inputId">
+                    <div class="form-grid" id="formGrid">
+                        <!-- Inputs injected via JS -->
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button disabled hidden type="button" class="btn btn-danger" id="btnDelete" onclick="deleteData()" style="display: none;">Hapus</button>
+                <div style="flex: 1;"></div>
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Batal</button>
+                <button type="button" class="btn btn-primary" onclick="submitForm()">Simpan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loader -->
+    <div class="loader-overlay" id="loader">
+        <div class="spinner"></div>
+        <p style="margin-top: 10px; color: #6b7280;">Memproses...</p>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+
+    <script>
+        // ===== CONFIGURATION =====
+        const API_URL = "https://script.google.com/macros/s/AKfycbyEbP1Asna3tCDWNuJuiLLUBUTm3QeabvNMknn2owPwUR_oa4k3RTtZk9E21_l-ZZIu/exec";
+
+        // ===== STATE =====
+        let state = {
+            headers: {},
+            columnLabels: {}, 
+            dropdowns: {},
+            data: [],
+            readonlyCols: [],
+            fileName: '', 
+            
+            // Pagination & Search
+            currentPage: 1,
+            rowsPerPage: 20,
+            searchTerm: '',
+            filteredData: []
+        };
+
+        // ===== INITIALIZATION =====
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadData();
+        });
+
+        async function loadData() {
+            showLoader(true);
+            try {
+                const [headersRes, dropdownsRes, dataRes, nameFileRes] = await Promise.all([
+                    fetchAPI('headers'),
+                    fetchAPI('dropdown'),
+                    fetchAPI('read'),
+                    fetchAPI('namefile')
+                ]);
+
+                if (headersRes.success) {
+                    state.headers = headersRes.rows;
+                    processColumnLabels();
+                }
+                if (dropdownsRes.success) state.dropdowns = dropdownsRes.dropdowns || {};
+                if (dataRes.success) {
+                    state.data = dataRes.data;
+                    state.readonlyCols = dataRes.readonly || [];
+                    state.filteredData = state.data;
+                }
+                
+                if (nameFileRes.success && nameFileRes.name) {
+                    state.fileName = nameFileRes.name;
+                    document.getElementById('sheetTitle').textContent = state.fileName;
+                }
+
+                renderTable();
+            } catch (error) {
+                console.error(error);
+                showToast("Gagal memuat data", "error");
+            } finally {
+                showLoader(false);
+            }
+        }
+
+        // ===== API HELPER (SIMPLE - NO CORS HEADERS) =====
+        async function fetchAPI(action, data = {}) {
+            let url = `${API_URL}?action=${action}`;
+            const options = {
+                method: 'POST',
+                // Kita TIDAK menambahkan headers 'Content-Type': 'application/json'
+                // Browser akan mengirim default 'text/plain'.
+                // Code.gs telah dimodifikasi untuk membaca e.postData.contents secara langsung,
+                // sehingga tidak terjadi error CORS Preflight.
+                body: JSON.stringify(data)
+            };
+            const response = await fetch(url, options);
+            const result = await response.json();
+            return result;
+        }
+
+        // ===== LOGIC: LABEL GENERATION =====
+        function processColumnLabels() {
+            const firstRow = state.headers['ROW1'];
+            if (!firstRow) return;
+            const keys = Object.keys(firstRow);
+            const maxCol = parseInt(keys[keys.length - 1].replace('COL', ''), 10);
+
+            for (let c = 1; c <= maxCol; c++) {
+                const colKey = `COL${String(c).padStart(3, '0')}`;
+                let headerParts = [];
+                for (let r = 1; r <= 5; r++) {
+                    const rowKey = `ROW${r}`;
+                    if (state.headers[rowKey] && state.headers[rowKey][colKey]) {
+                        const val = state.headers[rowKey][colKey].value;
+                        if (val) headerParts.push(val);
+                    }
+                }
+                const uniqueParts = [...new Set(headerParts)];
+                state.columnLabels[colKey] = uniqueParts.join(" | ");
+            }
+        }
+
+        // ===== RENDER: TABLE HEADERS =====
+        function renderTable() {
+            const thead = document.getElementById('tableHead');
+            const tbody = document.getElementById('tableBody');
+            thead.innerHTML = '';
+            tbody.innerHTML = '';
+
+            if (!state.headers['ROW1']) {
+                tbody.innerHTML = '<tr><td colspan="100" class="empty-state">Struktur header tidak ditemukan</td></tr>';
+                return;
+            }
+
+            const firstRow = state.headers['ROW1'];
+            const keys = Object.keys(firstRow);
+            const maxCol = parseInt(keys[keys.length - 1].replace('COL', ''), 10);
+            
+            // Grid map untuk melacak sel yang sudah tertutup oleh merge
+            const gridMap = Array(6).fill(null).map(() => Array(maxCol + 1).fill(false));
+
+            for (let r = 1; r <= 5; r++) {
+                const tr = document.createElement('tr');
+                const rowData = state.headers[`ROW${r}`];
+
+                for (let c = 1; c <= maxCol; c++) {
+                    const colKey = `COL${String(c).padStart(3, '0')}`;
+
+                    // Jika posisi ini sudah ditempati oleh merge dari sel sebelumnya, skip
+                    if (gridMap[r][c]) continue;
+
+                    const cell = rowData[colKey];
+                    const th = document.createElement('th');
+                    th.textContent = cell.value || '';
+                    
+                    // --- LOGIC HEADER ---
+                    if (cell.isMerged) {
+                        const colspan = parseInt(cell.colspan, 10) || 1;
+                        const rowspan = parseInt(cell.rowspan, 10) || 1;
+                        
+                        th.colSpan = colspan;
+                        th.rowSpan = rowspan;
+
+                        // Tandai area di gridMap
+                        for (let ri = 0; ri < rowspan; ri++) {
+                            for (let ci = 0; ci < colspan; ci++) {
+                                gridMap[r + ri][c + ci] = true;
+                            }
+                        }
+                    } else {
+                        th.colSpan = 1;
+                        th.rowSpan = 1;
+                        gridMap[r][c] = true;
+                    }
+
+                    tr.appendChild(th);
+                }
+                thead.appendChild(tr);
+            }
+
+            updatePaginationUI();
+            
+            const totalItems = state.filteredData.length;
+            if (totalItems === 0) {
+                tbody.innerHTML = '<tr><td colspan="100" class="empty-state">Data tidak ditemukan.</td></tr>';
+                return;
+            }
+
+            const start = (state.currentPage - 1) * state.rowsPerPage;
+            const end = start + state.rowsPerPage;
+            const visibleData = state.filteredData.slice(start, end);
+
+            visibleData.forEach(row => {
+                const tr = createRowElement(row);
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Helper: Create TR Element
+        function createRowElement(row) {
+            const tr = document.createElement('tr');
+            tr.setAttribute('data-id', row.ID); 
+            
+            // Kirim ID saja
+            tr.onclick = () => openModal('edit', row.ID);
+            
+            const firstRow = state.headers['ROW1'];
+            const keys = Object.keys(firstRow);
+            const maxCol = parseInt(keys[keys.length - 1].replace('COL', ''), 10);
+
+            for (let c = 1; c <= maxCol; c++) {
+                const colKey = `COL${String(c).padStart(3, '0')}`;
+                const td = document.createElement('td');
+                td.textContent = row[colKey] || '';
+                if (state.readonlyCols.includes(c)) {
+                    td.style.color = '#9ca3af';
+                    td.style.fontStyle = 'italic';
+                }
+                tr.appendChild(td);
+            }
+            return tr;
+        }
+
+        // ===== SEARCH & PAGINATION LOGIC =====
+        function updatePaginationUI() {
+            const totalItems = state.filteredData.length;
+            const totalPages = Math.ceil(totalItems / state.rowsPerPage) || 1;
+            document.getElementById('pageInfo').textContent = `Hal ${state.currentPage} / ${totalPages}`;
+            document.getElementById('btnPrev').disabled = state.currentPage === 1;
+            document.getElementById('btnNext').disabled = state.currentPage === totalPages || totalItems === 0;
+        }
+
+        function handleSearch() {
+            const term = document.getElementById('searchInput').value.toLowerCase();
+            state.searchTerm = term;
+            state.currentPage = 1;
+
+            if (!term) {
+                state.filteredData = state.data;
+            } else {
+                state.filteredData = state.data.filter(row => {
+                    return Object.values(row).some(val => 
+                        String(val).toLowerCase().includes(term)
+                    );
+                });
+            }
+            renderTable(); 
+        }
+
+        function changePage(direction) {
+            const totalPages = Math.ceil(state.filteredData.length / state.rowsPerPage);
+            const newPage = state.currentPage + direction;
+            if (newPage >= 1 && newPage <= totalPages) {
+                state.currentPage = newPage;
+                renderTable();
+            }
+        }
+
+        function changeRowsPerPage() {
+            state.rowsPerPage = parseInt(document.getElementById('rowsPerPage').value);
+            state.currentPage = 1;
+            renderTable();
+        }
+
+        // ===== CRUD HANDLERS =====
+
+        async function submitForm() {
+            showLoader(true);
+            const form = document.getElementById('crudForm');
+            const formData = new FormData(form);
+            const data = {};
+            for (let [key, value] of formData.entries()) data[key] = value;
+
+            try {
+                const action = (currentMode === 'create') ? 'create' : 'update';
+                const res = await fetchAPI(action, data);
+
+                if (res.success) {
+                    showToast(res.message || "Berhasil disimpan", "success");
+                    closeModal();
+
+                    // Refresh data dari server untuk memastikan format tampilan update (Rp, Tanggal)
+                    if (action === 'update') {
+                        const freshRowRes = await fetchAPI('read', { id: data.id });
+                        if (freshRowRes.success && freshRowRes.data.length > 0) {
+                            const newRow = freshRowRes.data[0];
+                            
+                            // Update Master Data
+                            const index = state.data.findIndex(r => r.ID === data.id);
+                            if (index !== -1) state.data[index] = newRow;
+
+                            // Cek Filter
+                            const isMatch = !state.searchTerm || Object.values(newRow).some(val => 
+                                String(val).toLowerCase().includes(state.searchTerm)
+                            );
+
+                            // Update Filtered Data & DOM
+                            if (isMatch) {
+                                const fIndex = state.filteredData.findIndex(r => r.ID === data.id);
+                                if (fIndex !== -1) {
+                                    state.filteredData[fIndex] = newRow;
+                                    updateRowInDOM(newRow);
+                                } else {
+                                    state.filteredData.push(newRow);
+                                    addNewRowToDOM(newRow);
+                                }
+                            } else {
+                                state.filteredData = state.filteredData.filter(r => r.ID !== data.id);
+                                removeRowFromDOM(data.id);
+                            }
+                        }
+                    } else {
+                        // Logic Create
+                        const freshRowRes = await fetchAPI('read', { id: res.id });
+                        if (freshRowRes.success && freshRowRes.data.length > 0) {
+                            const newRow = freshRowRes.data[0];
+                            
+                            // Masukkan ke master data
+                            state.data.push(newRow);
+
+                            const isMatch = !state.searchTerm || Object.values(newRow).some(val => 
+                                String(val).toLowerCase().includes(state.searchTerm)
+                            );
+
+                            if (isMatch) {
+                                state.filteredData.push(newRow);
+                                addNewRowToDOM(newRow);
+                            }
+                        }
+                    }
+
+                } else {
+                    showToast(res.error || "Terjadi kesalahan", "error");
+                }
+            } catch (error) {
+                console.error(error);
+                showToast("Gagal menghubungi server", "error");
+            } finally {
+                showLoader(false);
+            }
+        }
+
+        async function deleteData() {
+            const id = document.getElementById('inputId').value;
+            if (!id || !confirm("Apakah Anda yakin ingin menghapus data ini?")) return;
+
+            showLoader(true);
+            try {
+                const res = await fetchAPI('delete', { id: id });
+                if (res.success) {
+                    showToast(res.message || "Data dihapus", "success");
+                    closeModal();
+                    
+                    state.data = state.data.filter(r => r.ID !== id);
+                    state.filteredData = state.filteredData.filter(r => r.ID !== id);
+                    removeRowFromDOM(id);
+                    
+                    const totalItems = state.filteredData.length;
+                    const totalPages = Math.ceil(totalItems / state.rowsPerPage);
+                    if (state.currentPage > totalPages && state.currentPage > 1) {
+                        state.currentPage = totalPages;
+                        renderTable(); 
+                    } else {
+                        updatePaginationUI();
+                    }
+
+                } else {
+                    showToast(res.error || "Gagal menghapus", "error");
+                }
+            } catch (error) {
+                showToast("Gagal menghubungi server", "error");
+            } finally {
+                showLoader(false);
+            }
+        }
+
+        // ===== DOM MANIPULATION HELPERS =====
+        
+        function updateRowInDOM(rowData) {
+            const tr = document.querySelector(`tr[data-id="${rowData.ID}"]`);
+            if (tr) {
+                tr.classList.remove('row-updated');
+                void tr.offsetWidth; 
+                tr.classList.add('row-updated');
+
+                const cells = tr.querySelectorAll('td');
+                const firstRow = state.headers['ROW1'];
+                const keys = Object.keys(firstRow);
+                const maxCol = parseInt(keys[keys.length - 1].replace('COL', ''), 10);
+
+                for (let c = 1; c <= maxCol; c++) {
+                    const colKey = `COL${String(c).padStart(3, '0')}`;
+                    if (cells[c-1]) {
+                        cells[c-1].textContent = rowData[colKey] || '';
+                    }
+                }
+            }
+        }
+
+        function removeRowFromDOM(id) {
+            const tr = document.querySelector(`tr[data-id="${id}"]`);
+            if (tr) {
+                tr.remove();
+            }
+        }
+
+        function addNewRowToDOM(rowData) {
+            const totalItems = state.filteredData.length;
+            const totalPages = Math.ceil(totalItems / state.rowsPerPage);
+            
+            // Tambah ke DOM jika berada di halaman terakhir
+            if (state.currentPage === totalPages || totalItems === 1) {
+                const tbody = document.getElementById('tableBody');
+                const tr = createRowElement(rowData);
+                tr.classList.add('row-updated'); 
+                tbody.appendChild(tr);
+                updatePaginationUI();
+            } else {
+                updatePaginationUI();
+            }
+        }
+
+        // ===== MODAL LOGIC =====
+        let currentMode = 'create';
+
+        function openModal(mode, rowDataOrId = null) {
+            currentMode = mode;
+            const modal = document.getElementById('crudModal');
+            const title = document.getElementById('modalTitle');
+            const formGrid = document.getElementById('formGrid');
+            const btnDelete = document.getElementById('btnDelete');
+            const form = document.getElementById('crudForm');
+
+            formGrid.innerHTML = '';
+            form.reset();
+
+            // Cari data row dari state.data berdasarkan ID untuk memastikan data terbaru
+            let rowData = null;
+
+            if (mode === 'create') {
+                title.textContent = "Tambah Data Baru";
+                btnDelete.style.display = 'none';
+                document.getElementById('inputId').value = '';
+            } else {
+                title.textContent = "Edit Data";
+                btnDelete.style.display = 'block';
+                
+                // Logic cari data
+                if (typeof rowDataOrId === 'string' || typeof rowDataOrId === 'number') {
+                    rowData = state.data.find(r => r.ID == rowDataOrId);
+                } else if (typeof rowDataOrId === 'object' && rowDataOrId !== null) {
+                    rowData = rowDataOrId;
+                }
+
+                if (!rowData) {
+                    showToast("Data tidak ditemukan", "error");
+                    return;
+                }
+                
+                document.getElementById('inputId').value = rowData.ID;
+            }
+
+            const firstRow = state.headers['ROW1'];
+            const keys = Object.keys(firstRow);
+            const maxCol = parseInt(keys[keys.length - 1].replace('COL', ''), 10);
+
+            for (let c = 1; c <= maxCol; c++) {
+                const colKey = `COL${String(c).padStart(3, '0')}`;
+                const isReadonly = state.readonlyCols.includes(c);
+                const label = state.columnLabels[colKey] || `Kolom ${c}`;
+                
+                // Ambil nilai dari rowData
+                const value = (mode === 'edit' && rowData) ? (rowData[colKey] || '') : '';
+                
+                const div = document.createElement('div');
+                div.className = 'form-group';
+                const labelEl = document.createElement('label');
+                labelEl.textContent = label;
+                div.appendChild(labelEl);
+
+                let inputEl;
+                if (state.dropdowns[colKey]) {
+                    inputEl = document.createElement('select');
+                    inputEl.name = colKey;
+                    const optEmpty = document.createElement('option');
+                    optEmpty.value = ""; optEmpty.textContent = "- Pilih -";
+                    inputEl.appendChild(optEmpty);
+                    state.dropdowns[colKey].options.forEach(opt => {
+                        const option = document.createElement('option');
+                        option.value = opt; option.textContent = opt;
+                        // Bandingkan string untuk dropdown agar lebih aman
+                        if (String(opt) === String(value)) option.selected = true;
+                        inputEl.appendChild(option);
+                    });
+                    if (isReadonly) inputEl.disabled = true;
+                } else {
+                    inputEl = document.createElement('input');
+                    inputEl.type = 'text'; inputEl.name = colKey; inputEl.value = value;
+                    if (isReadonly) inputEl.disabled = true;
+                }
+                div.appendChild(inputEl);
+                formGrid.appendChild(div);
+            }
+            modal.classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('crudModal').classList.remove('active');
+        }
+
+        // ===== UTILS =====
+        function showLoader(show) {
+            const el = document.getElementById('loader');
+            if (show) el.classList.add('active'); else el.classList.remove('active');
+        }
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                toast.style.transition = 'all 0.3s ease-in';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
